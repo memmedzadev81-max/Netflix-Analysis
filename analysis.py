@@ -1,8 +1,11 @@
 """
-Netflix titles sample analysis — content mix by type, country, year, rating.
-Sample data in data/netflix_titles_sample.csv.
+Netflix titles analysis — content mix by type, country, year, rating.
+Creates a sample CSV automatically if data/netflix_titles_sample.csv is missing.
 """
 from pathlib import Path
+import random
+from datetime import datetime, timedelta
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -11,10 +14,50 @@ BASE = Path(__file__).resolve().parent
 DATA = BASE / "data" / "netflix_titles_sample.csv"
 IMG = BASE / "images"
 IMG.mkdir(exist_ok=True)
+(BASE / "data").mkdir(exist_ok=True)
 sns.set_theme(style="whitegrid")
+random.seed(42)
+
+
+def ensure_sample_csv(path: Path, n: int = 250) -> None:
+    if path.exists():
+        return
+    types = ["Movie", "TV Show"]
+    ratings = ["TV-MA", "TV-14", "R", "PG-13", "TV-PG", "PG"]
+    countries = [
+        "United States", "India", "United Kingdom", "Japan",
+        "South Korea", "Turkey", "Canada", "France", "Spain", "Mexico",
+    ]
+    genres = [
+        "Dramas", "Comedies", "Documentaries", "Action & Adventure",
+        "International Movies", "Kids' TV", "Thrillers", "Romance",
+    ]
+    rows = []
+    for i in range(1, n + 1):
+        t = "Movie" if i % 3 else "TV Show"
+        if i % 5 == 0:
+            country = "United States"
+        else:
+            country = random.choice(countries)
+        rows.append(
+            {
+                "show_id": f"s{i}",
+                "type": t,
+                "title": f"Title {i}",
+                "country": country,
+                "release_year": random.randint(2010, 2024),
+                "rating": random.choice(ratings),
+                "duration": f"{random.randint(80, 160)} min" if t == "Movie" else f"{random.randint(1, 4)} Seasons",
+                "listed_in": ", ".join(random.sample(genres, k=2)),
+                "date_added": (datetime(2018, 1, 1) + timedelta(days=random.randint(0, 2000))).strftime("%Y-%m-%d"),
+            }
+        )
+    pd.DataFrame(rows).to_csv(path, index=False)
+    print(f"Created sample data: {path} ({n} rows)")
 
 
 def load():
+    ensure_sample_csv(DATA)
     df = pd.read_csv(DATA, parse_dates=["date_added"])
     print(f"Loaded {len(df)} titles")
     return df
@@ -24,7 +67,6 @@ def clean(df):
     df = df.copy()
     df["country"] = df["country"].fillna("Unknown")
     df["primary_country"] = df["country"].astype(str).str.split(",").str[0].str.strip()
-    df["year_added"] = df["date_added"].dt.year
     return df
 
 
@@ -78,10 +120,8 @@ def main():
     df = clean(load())
     summary(df)
     charts(df)
-    movie_pct = (df["type"] == "Movie").mean() * 100
-    us_pct = (df["primary_country"] == "United States").mean() * 100
-    print(f"\nMovie share: {movie_pct:.1f}%")
-    print(f"US primary share: {us_pct:.1f}%")
+    print(f"\nMovie share: {(df['type']=='Movie').mean()*100:.1f}%")
+    print(f"US primary share: {(df['primary_country']=='United States').mean()*100:.1f}%")
     print("Done.")
 
 
